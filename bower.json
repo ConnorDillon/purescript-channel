@@ -1,5 +1,19 @@
 {
   "name": "purescript-channel",
+  "homepage": "https://github.com/ConnorDillon/purescript-channel",
+  "authors": [
+    "Connor Dillon <connor@cdillon.nl>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ConnorDillon/purescript-channel.git"
+  },
+  "main": "",
+  "keywords": [
+    "PureScript",
+    "Channel"
+  ],
+  "license": "Apache-2.0",
   "ignore": [
     "**/.*",
     "node_modules",
