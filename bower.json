@@ -23,9 +23,16 @@
   "dependencies": {
     "purescript-prelude": "^4.0.0",
     "purescript-console": "^4.0.0",
-    "purescript-effect": "^2.0.0"
+    "purescript-effect": "^2.0.0",
+    "purescript-contravariant": "^4.0.0",
+    "purescript-aff": "^5.0.0",
+    "purescript-avar": "^3.0.0",
+    "purescript-newtype": "^3.0.0",
+    "purescript-control": "^4.0.0",
+    "purescript-exceptions": "^4.0.0"
   },
   "devDependencies": {
-    "purescript-psci-support": "^4.0.0"
+    "purescript-psci-support": "^4.0.0",
+    "purescript-assert": "^4.0.0"
   }
 }
