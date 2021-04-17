@@ -19,6 +19,7 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, message, throwException)
 
+-- | An `Output` is a wrapper around a function that sends values to a `Channel`. 
 newtype Output a = Output (a -> Aff Boolean)
 
 derive instance newtypeOutput :: Newtype (Output a) _
@@ -38,6 +39,8 @@ instance decideOutput :: Decide Output where
     Left y -> send o y
     Right z -> send o' z
 
+-- | Will try to send to the first `Output` and if it is closed,
+-- | then to the second.
 instance semigroupOutput :: Semigroup (Output a) where
   append o o' = Output $ \x -> do
     result <- send o x
@@ -48,6 +51,7 @@ instance semigroupOutput :: Semigroup (Output a) where
 instance monoidOutput :: Monoid (Output a) where
   mempty = conquer
 
+-- | An `Input` is a wrapper around a function that receive values from a `Channel`. 
 newtype Input a = Input (Aff (Maybe a))
 
 derive instance newtypeInput :: Newtype (Input a) _
@@ -65,6 +69,8 @@ instance bindInput :: Bind Input where
 
 instance monadInput :: Monad Input
 
+-- | Will try to receive from the first `Input` and if it is closed,
+-- | then from the second.
 instance altInput :: Alt Input where
   alt i i' = Input do
     result <- recv i
@@ -81,6 +87,7 @@ instance monadZeroInput :: MonadZero Input
 
 instance monadPlusInput :: MonadPlus Input
 
+-- | Same as `Alt`
 instance semigroupInput :: Semigroup (Input a) where
   append = alt
 
@@ -93,17 +100,25 @@ instance monadEffectInput :: MonadEffect Input where
 instance monadAffInput :: MonadAff Input where
   liftAff aff = Input $ map Just aff
 
+-- | A `Channel` is an abstraction over a var, queue or stream backend and
+-- | can be used as a communication channel between async threads.
 type Channel o i = {output :: Output o, input :: Input i, close :: Aff Unit}
 
+-- | Receives a value from an `Input`. If the `Input` is closed, the result will
+-- | be `Nothing`.
 recv :: forall a. Input a -> Aff (Maybe a)
 recv = unwrap
 
+-- | Sends a value to an `Output`. Will return `false` if the `Output` is closed
+-- | and `true` if not.
 send :: forall a. Output a -> a -> Aff Boolean
 send = unwrap
 
+-- | Creates a new `Channel` using an `AVar` backend.
 newChannel :: forall a. Effect (Channel a a)
 newChannel = AVar.empty >>= avarChannel
 
+-- | Creates a new `Channel` with a provided `AVar` as backend.
 avarChannel :: forall a. AVar a -> Effect (Channel a a)
 avarChannel var = pure {output: Output trySend, input: Input tryRecv, close}
   where
@@ -120,9 +135,14 @@ avarChannel var = pure {output: Output trySend, input: Input tryRecv, close}
       (catch Nothing)
     close = kill (error msg) var
 
+-- | Creates a new `Channel` using the `Input` from the first provided `Channel`
+-- | and the `Output` from the second. Closing the new `Channel` will also close
+-- | the provided two `Channel`s.
 inner :: forall o i o' i'. Channel o i -> Channel o' i' -> Channel o' i
 inner c c' = {input: c.input, output: c'.output, close: c.close *> c'.close}
 
+-- | Launches an async thread that sends all values from the `Input` to the `Output`
+-- | in the background.
 connect :: forall a. Input a -> Output a -> Effect Unit
 connect i o = launchAff_ $ recv i >>= loop
   where
