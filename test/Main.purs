@@ -2,14 +2,16 @@ module Test.Main where
 
 import Prelude
 
-import Concurrent.Channel (avarChannel, connect, newChannel, recv, send)
+import Concurrent.Channel (avarChannel, connect, newChannel, recv, recvList, send, sendList, sendTraversable)
+import Control.Monad.List.Trans (foldl, repeat, take)
+import Control.Monad.Rec.Class (forever)
 import Data.Divide (divided)
 import Data.Divisible (conquer)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.AVar as AVar
-import Effect.Aff (Aff, launchAff_)
+import Effect.Aff (Aff, forkAff, joinFiber, launchAff_)
 import Effect.Aff.AVar (tryTake)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
@@ -97,6 +99,32 @@ testInputMonad = test "input/monad" do
   result1 <- recv $ chan1.input >>= \x -> pure $ x + 1
   pure $ result1 == Just 2
 
+testRecvList :: Aff Unit
+testRecvList = test "recv/list" do
+  chan <- liftEffect newChannel
+  void $ forkAff $ forever $ send chan.output 1
+  let list = take 5 $ recvList chan.input
+  result <- foldl (+) 0 list
+  pure $ result == 5
+
+testSendList :: Aff Unit
+testSendList = test "send/list" do
+  chan <- liftEffect newChannel
+  fiber <- forkAff $ sendList chan.output $ repeat 1
+  result1 <- recv $ (+) <$> chan.input <*> chan.input 
+  chan.close
+  result2 <- joinFiber fiber
+  pure $ result1 == Just 2 && not result2
+
+testSendTraversable :: Aff Unit
+testSendTraversable = test "send/traversable" do
+  chan <- liftEffect newChannel
+  fiber <- forkAff $ sendTraversable chan.output [1, 2, 3, 4]
+  result1 <- recv $ (+) <$> chan.input <*> chan.input 
+  chan.close
+  result2 <- joinFiber fiber
+  pure $ result1 == Just 3 && not result2
+
 main :: Effect Unit
 main = launchAff_ do
   testSend
@@ -109,3 +137,6 @@ main = launchAff_ do
   testInputMonoid
   testInputApplicative
   testInputMonad
+  testRecvList
+  testSendList
+  testSendTraversable

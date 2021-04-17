@@ -2,20 +2,23 @@ module Concurrent.Channel where
 
 import Prelude
 
+import Control.Monad.List.Trans (ListT, nil, prepend', uncons)
 import Control.MonadPlus (class Alt, class Alternative, class MonadPlus, class MonadZero, class Plus, alt, empty)
 import Data.Decide (class Decide)
 import Data.Divide (class Divide)
 import Data.Divisible (class Divisible, conquer)
 import Data.Either (Either(..))
 import Data.Functor.Contravariant (class Contravariant)
+import Data.Lazy (defer)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Traversable (class Traversable, all, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.AVar as AVar
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Aff.AVar (AVar, put, take, kill)
-import Effect.Aff.Class (class MonadAff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, message, throwException)
 
@@ -153,3 +156,30 @@ connect i o = launchAff_ $ recv i >>= loop
            then recv i >>= loop
            else pure unit
       Nothing -> pure unit
+
+-- | Lazily drains an `Input` into a `ListT`. The list will end when the Input is
+-- | closed.
+recvList :: forall m. MonadAff m => Input ~> ListT m
+recvList input = do
+  elem <- liftAff $ recv input
+  case elem of
+    Just e -> prepend' e $ defer \_ -> recvList input
+    Nothing -> nil
+
+-- | Sends a `ListT` into an `Output`. Returns `false` if the `Output` was closed
+-- | before the entire list was sent.
+sendList :: forall m a. MonadAff m => Output a -> ListT m a -> m Boolean
+sendList output list = do
+  unc <- uncons list
+  case unc of
+    Just (Tuple x xs) -> do
+      result <- liftAff $ send output x
+      if result
+         then sendList output xs
+         else pure false
+    Nothing -> pure true
+
+-- | Sends a `Traversable` into an `Output`. Returns `false` if the `Output` was closed
+-- | before the entire traversable was sent.
+sendTraversable :: forall t a. Traversable t => Output a -> t a -> Aff Boolean
+sendTraversable output = pure <<< all identity <=< traverse (send output)
