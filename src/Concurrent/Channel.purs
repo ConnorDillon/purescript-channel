@@ -39,7 +39,11 @@ instance decideOutput :: Decide Output where
     Right z -> send o' z
 
 instance semigroupOutput :: Semigroup (Output a) where
-  append o o' = Output $ \x -> (||) <$> send o x  <*> send o' x
+  append o o' = Output $ \x -> do
+    result <- send o x
+    if result
+       then pure true
+       else send o' x
 
 instance monoidOutput :: Monoid (Output a) where
   mempty = conquer
