@@ -3,7 +3,7 @@ module Concurrent.Channel where
 import Prelude
 
 import Control.Monad.List.Trans (ListT, nil, prepend', uncons)
-import Control.MonadPlus (class Alt, class Alternative, class MonadPlus, class MonadZero, class Plus, alt, empty)
+import Control.MonadPlus (class Alt, class Alternative, class MonadPlus, class Plus, alt, empty)
 import Data.Decide (class Decide)
 import Data.Divide (class Divide)
 import Data.Divisible (class Divisible, conquer)
@@ -85,8 +85,6 @@ instance plusInput :: Plus Input where
   empty = Input $ pure Nothing
 
 instance alternativeInput :: Alternative Input
-
-instance monadZeroInput :: MonadZero Input
 
 instance monadPlusInput :: MonadPlus Input
 
